@@ -45,8 +45,6 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "vector.h"
-
 static volatile bool force_quit;
 
 /* MAC updating enabled by default */
@@ -117,7 +115,7 @@ struct l2fwd_port_statistics port_statistics[RTE_MAX_ETHPORTS];
 
 #define MAX_TIMER_PERIOD 86400 /* 1 day max */
 /* A tsc-based timer responsible for triggering statistics printout */
-static uint64_t timer_period = 10; /* default period is 10 seconds */
+static uint64_t timer_period = 2; /* default period is 10 seconds */
 
 /* Print out statistics on packets dropped */
 static void
@@ -176,6 +174,15 @@ print_stats(void)
 #define LAYER_NUM 3
 #define SEG_NUM 5
 unsigned normal_order[] = {2, 3, 4};
+
+static void
+print_order(unsigned* order, unsigned enter)
+{
+	for (int i =0; i<LAYER_NUM; i++) {
+		printf("%u ", order[i]);
+	}
+	if (enter) printf("\n");
+}
 
 struct seg {
 	unsigned start_pos;
@@ -323,8 +330,8 @@ parse_ip(char* payload, unsigned start_pos, struct layer *layers, unsigned num_l
 	/* raw: fake brs */
 	if (brs->proto == 0) {
 		brs->proto = hdr->next_proto_id;
-		start_pos += 1;
 		push_seg(&layers[num_layer], start_pos, 1, 1);
+		start_pos += 1;
 	}
 	/* disorderred: */
 	else {
@@ -349,7 +356,7 @@ parse_arp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_
 
 	brs->proto = -1;
 
-	printf("arp parsed\n");
+	// printf("arp parsed\n");
 }
 
 static void
@@ -438,7 +445,7 @@ parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer* layers, stru
 				parse_arp(payload, cur_pos, layers, 1, brs);
 			}
 			else {
-				printf("unknown L3 proto\n");
+				// printf("unknown L3 proto\n");
 			}
 			cur_pos += len_of_layer(&layers[1]) - (raw ? 0 : len_of_br_seg(&layers[1]));
 		}
@@ -446,7 +453,7 @@ parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer* layers, stru
 			// printf("cur_pos: %u\n", cur_pos);
 			/* no layer 4 */
 			if (brs->proto == -1) {
-				printf("no layer 4\n");
+				// printf("no layer 4\n");
 				continue;
 			}
 
@@ -461,7 +468,7 @@ parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer* layers, stru
 				parse_icmp(payload, cur_pos, layers, 2, brs);
 			}
 			else {
-				printf("unknown L4 proto\n");
+				// printf("unknown L4 proto\n");
 			}
 			cur_pos += len_of_layer(&layers[2]) - (raw ? 0 : len_of_br_seg(&layers[2]));
 		}
@@ -559,6 +566,7 @@ print_rule(struct mac_rule* rule)
 struct mac_table {
 	struct mac_rule rules[TABLE_SIZE];
 	unsigned rule_num;
+	unsigned version;
 };
 
 static int
@@ -709,21 +717,44 @@ process_rule(struct mac_table* table, char* line)
 static void
 update_table(struct mac_table* table)
 {
+	// printf("updating table\n");
+	// print_table(table);
+
 	FILE* fp;
 	fp = fopen(TABLE_FILE, "r");
 	if (fp == NULL) return;
 
-	clear_table(table);
 
 	char* line = NULL;
 	size_t len = 0;
 	ssize_t read;
+
+	read = getline(&line, &len, fp);
+	if (read == -1) {
+		printf("read table file wrong\n");
+		fclose(fp);
+		return;
+	}
+
+	unsigned version = atoi(line);
+	if (version == table->version) {
+		fclose(fp);
+		return;
+	}
+
+	clear_table(table);
+	table->version = version;
 	while ((read = getline(&line, &len, fp)) != -1) {
 		process_rule(table, line);		
 	}
-
 	fclose(fp);
 
+	if (table->rule_num == 0) {
+		printf("no table rule, exit\n");
+		exit(-1);
+	}
+
+	printf("table updated\n");
 	print_table(table);
 }
 
@@ -758,8 +789,6 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 		port_statistics[dst_port].tx += sent;
 }
 
-struct mac_table global_table;
-unsigned global_order[3];
 
 /* main processing loop */
 static void
@@ -776,6 +805,12 @@ l2fwd_main_loop(void)
 			BURST_TX_DRAIN_US;
 	struct rte_eth_dev_tx_buffer *buffer;
 
+	struct mac_table per_core_table;
+	unsigned per_core_order[3];
+	per_core_table.rule_num = 0;
+	update_table(&per_core_table);
+	
+	COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
 
 	prev_tsc = 0;
 	timer_tsc = 0;
@@ -827,13 +862,17 @@ l2fwd_main_loop(void)
 
 				/* if timer has reached its timeout */
 				if (unlikely(timer_tsc >= timer_period)) {
-
+					
 					/* do this only on main core */
-					if (lcore_id == rte_get_main_lcore()) {
-						print_stats();
-						/* reset the timer */
-						timer_tsc = 0;
-					}
+					// if (lcore_id == rte_get_main_lcore()) {
+					// 	print_stats();
+					// }
+					update_table(&per_core_table);
+					COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
+					// printf("updated per core order: ");
+					// print_order(per_core_order, 1);
+					/* reset the timer */
+					timer_tsc = 0;
 				}
 			}
 
@@ -859,11 +898,18 @@ l2fwd_main_loop(void)
 				unsigned target_order[3];
 				unsigned dst_port = -1;
 
-				/* by default we view each packet is in global order (usually disordered) */
-				COPY_ORDER(cur_order, global_order);
+				// printf("\n\n");
 				/* from normal port, meaning it is in 2-3-4 order */
 				if (portid == NORMAL_PORT) {
+					// printf("coming from normal port\n");
 					COPY_ORDER(cur_order, normal_order);
+				}
+				/* by default we view each packet is in global order (usually disordered) */
+				else {
+					// printf("non-normal port: ");
+					// print_order(per_core_order, 1);
+					COPY_ORDER(cur_order, per_core_order);
+					// print_order(cur_order, 1);
 				}
 
 				struct layer layers[LAYER_NUM];
@@ -882,14 +928,14 @@ l2fwd_main_loop(void)
 				u_char* payload = rte_pktmbuf_mtod(m, u_char*);
 				uint8_t* dst_mac = payload + layers[0].seg_vec[0].start_pos + 6;
 				// print_mac(dst_mac, 1);
-				int matched = match_table(&global_table, dst_mac);
+				int matched = match_table(&per_core_table, dst_mac);
 				if (matched < 0) {
 					printf("no match for current mac, dropped\n");
 					continue;
 				}
 				else {
 					// printf("rule matched\n");
-					struct mac_rule *matched_rule = &global_table.rules[matched];
+					struct mac_rule *matched_rule = &per_core_table.rules[matched];
 					// print_rule(matched_rule);
 
 					COPY_ORDER(target_order, matched_rule->target_order);
@@ -898,6 +944,7 @@ l2fwd_main_loop(void)
 
 				/* from normal port, meaning it should be assembled in 2-3-4 order */
 				if (dst_port == NORMAL_PORT) {
+					// printf("sending to normal port\n");
 					COPY_ORDER(target_order, normal_order);
 				}
 
@@ -915,6 +962,9 @@ l2fwd_main_loop(void)
 					printf("mbuf copying wrong\n");
 					exit(-1);
 				}
+				// printf("assembling\n");
+				// print_order(cur_order, 1);
+				// print_order(target_order, 1);
 				assemble_fields(m, clone_mbuf, cur_order, target_order, layers, &brs);
 				rte_pktmbuf_free(clone_mbuf);
 
@@ -922,13 +972,13 @@ l2fwd_main_loop(void)
 				// struct branchers test_fake_brs;
 				// test_fake_brs.proto = 0;
 				// test_fake_brs.ether_type = 0;
-				// unsigned test_cur_order[] = {3, 4, 2};
+				// unsigned test_cur_order[] = {4, 2, 3};
 				// unsigned test_target_order[] = {2, 3, 4};
 
 				// printf("\nOUTPUT1\n");
 				// parse_fields(m, test_cur_order, test_layers, &test_fake_brs);
-				// // print_layers(test_layers, LAYER_NUM);
-				// // rte_pktmbuf_dump(stdout, m, 64);
+				// print_layers(test_layers, LAYER_NUM);
+				// rte_pktmbuf_dump(stdout, m, 64);
 
 				// // printf("\nREASSEMBLE\n");
 				// struct rte_mbuf* clone_mbuf2 = rte_pktmbuf_copy(m, l2fwd_pktmbuf_pool, 0, 10000000);
@@ -1302,15 +1352,6 @@ signal_handler(int signum)
 int
 main(int argc, char **argv)
 {
-	global_table.rule_num = 0;
-	update_table(&global_table);
-	if (global_table.rule_num == 0)
-	{
-		printf("no table rule, exit\n");
-		exit(-1);
-	}
-	COPY_ORDER(global_order, global_table.rules[0].target_order);
-
 	struct lcore_queue_conf *qconf;
 	int ret;
 	uint16_t nb_ports;
