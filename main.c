@@ -818,6 +818,7 @@ update_table(struct mac_table *table)
 	clear_table(table);
 	while ((read = getline(&line, &len, fp)) != -1)
 	{
+		if (read < 20) continue;
 		process_rule(table, line);
 	}
 	fclose(fp);
@@ -893,16 +894,20 @@ l2fwd_main_loop(void)
 	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
 							   BURST_TX_DRAIN_US;
 	struct rte_eth_dev_tx_buffer *buffer;
+	lcore_id = rte_lcore_id();
 
-	if (rte_lcore_id() == rte_get_main_lcore())
+	if (lcore_id == rte_get_main_lcore())
 	{
 		global_table.rule_num = 0;
+		printf("[%u] Reading mac table file\n", lcore_id);
 		update_table(&global_table);
 	}
 
+	rte_delay_us_sleep(500);
 	struct mac_table per_core_table;
 	unsigned per_core_order[LAYER_NUM];
 	per_core_table.rule_num = 0;
+	printf("[%u] Initilizing mac table\n", lcore_id);
 	refresh_table(&global_table, &per_core_table);
 
 	COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
@@ -910,7 +915,6 @@ l2fwd_main_loop(void)
 	prev_tsc = 0;
 	timer_tsc = 0;
 
-	lcore_id = rte_lcore_id();
 	qconf = &lcore_queue_conf[lcore_id];
 
 	if (qconf->n_rx_port == 0)
