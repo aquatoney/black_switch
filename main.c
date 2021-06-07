@@ -1012,7 +1012,9 @@ l2fwd_main_loop(void)
 				int matched = match_table(&per_core_table, dst_mac);
 				if (matched < 0)
 				{
-					printf("no match for current mac, dropped\n");
+					printf("no match for current mac:");
+					print_mac(dst_mac, 0);
+					printf(", dropped\n");
 					continue;
 				}
 				else
