@@ -398,7 +398,7 @@ parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer* layers, stru
 	unsigned num_layers = 0;
 	unsigned raw = 0;
 	unsigned restore = 0;
-	if (memcmp(normal_order, cur_order, LAYER_NUM*sizeof(unsigned)) == 0) raw = 1;
+	if (CMP_ORDER(normal_order, cur_order) == 0) raw = 1;
 
 	/* 2, 3, 4 in normal order */
 	for (int i=0; i<LAYER_NUM; i++) {
@@ -484,8 +484,8 @@ assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order,
 {
 	unsigned restore = 0;
 	unsigned raw = 0;
-	if (memcmp(normal_order, cur_order, LAYER_NUM*sizeof(unsigned)) == 0) raw = 1;
-	if (memcmp(normal_order, target_order, LAYER_NUM*sizeof(unsigned)) == 0) restore = 1;
+	if (CMP_ORDER(normal_order, cur_order) == 0) raw = 1;
+	if (CMP_ORDER(normal_order, target_order) == 0) restore = 1;
 
 	char* payload = rte_pktmbuf_mtod(old, char*);
 	char* new_payload = rte_pktmbuf_mtod(new, char*);
@@ -534,6 +534,9 @@ assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order,
 
 #define COPY_ORDER(dst, src) \
 	memcpy(dst, src, LAYER_NUM*sizeof(unsigned))
+
+#define CMP_ORDER(dst, src) \
+	memcmp(dst, src, LAYER_NUM*sizeof(unsigned))
 
 struct mac_rule {
 	uint8_t dst_mac[6];
@@ -806,7 +809,7 @@ l2fwd_main_loop(void)
 	struct rte_eth_dev_tx_buffer *buffer;
 
 	struct mac_table per_core_table;
-	unsigned per_core_order[3];
+	unsigned per_core_order[LAYER_NUM];
 	per_core_table.rule_num = 0;
 	update_table(&per_core_table);
 	
@@ -926,7 +929,7 @@ l2fwd_main_loop(void)
 				// printf("\nMATCHING\n");
 				/* get dst mac addr from layers */
 				u_char* payload = rte_pktmbuf_mtod(m, u_char*);
-				uint8_t* dst_mac = payload + layers[0].seg_vec[0].start_pos + 6;
+				uint8_t* dst_mac = payload + layers[0].seg_vec[0].start_pos;
 				// print_mac(dst_mac, 1);
 				int matched = match_table(&per_core_table, dst_mac);
 				if (matched < 0) {
@@ -949,7 +952,7 @@ l2fwd_main_loop(void)
 				}
 
 				/* if order is not changed */
-				if (memcmp(cur_order, target_order, LAYER_NUM * sizeof(unsigned)) == 0) {
+				if (CMP_ORDER(cur_order, target_order) == 0) {
 					// printf("no change, directly forward to dst_port\n");
 					l2fwd_port_forward(m, dst_port);
 					continue;
