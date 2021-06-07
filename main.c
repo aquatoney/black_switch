@@ -628,6 +628,8 @@ struct mac_table
 	unsigned version;
 };
 
+struct mac_table global_table;
+
 static int
 match_table(struct mac_table *table, uint8_t *dst_mac)
 {
@@ -814,7 +816,6 @@ update_table(struct mac_table *table)
 	}
 
 	clear_table(table);
-	table->version = version;
 	while ((read = getline(&line, &len, fp)) != -1)
 	{
 		process_rule(table, line);
@@ -826,8 +827,24 @@ update_table(struct mac_table *table)
 		printf("no table rule, exit\n");
 		exit(-1);
 	}
+	table->version = version;
 
-	printf("table updated\n");
+	printf("[%u] table updated\n", rte_lcore_id());
+	print_table(table);
+}
+
+static void
+refresh_table(struct mac_table *core, struct mac_table *table)
+{
+	if (core->version == table->version)
+		return;
+
+	clear_table(table);
+	table->version = core->version;
+	memcpy(table->rules, core->rules, core->rule_num * sizeof(struct mac_rule));
+	table->rule_num = core->rule_num;
+
+	printf("[%u] table refreshed\n", rte_lcore_id());
 	print_table(table);
 }
 
@@ -877,10 +894,16 @@ l2fwd_main_loop(void)
 							   BURST_TX_DRAIN_US;
 	struct rte_eth_dev_tx_buffer *buffer;
 
+	if (rte_lcore_id() == rte_get_main_lcore())
+	{
+		global_table.rule_num = 0;
+		update_table(&global_table);
+	}
+
 	struct mac_table per_core_table;
 	unsigned per_core_order[LAYER_NUM];
 	per_core_table.rule_num = 0;
-	update_table(&per_core_table);
+	refresh_table(&global_table, &per_core_table);
 
 	COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
 
@@ -941,10 +964,12 @@ l2fwd_main_loop(void)
 				{
 
 					/* do this only on main core */
-					// if (lcore_id == rte_get_main_lcore()) {
-					// 	print_stats();
-					// }
-					update_table(&per_core_table);
+					if (lcore_id == rte_get_main_lcore())
+					{
+						// print_stats();
+						update_table(&global_table);
+					}
+					refresh_table(&global_table, &per_core_table);
 					COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
 					// printf("updated per core order: ");
 					// print_order(per_core_order, 1);
