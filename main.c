@@ -73,8 +73,9 @@ static uint32_t l2fwd_enabled_port_mask = 0;
 /* list of enabled ports */
 static uint32_t l2fwd_dst_ports[RTE_MAX_ETHPORTS];
 
-struct port_pair_params {
-#define NUM_PORTS	2
+struct port_pair_params
+{
+#define NUM_PORTS 2
 	uint16_t port[NUM_PORTS];
 } __rte_cache_aligned;
 
@@ -86,7 +87,8 @@ static unsigned int l2fwd_rx_queue_per_lcore = 1;
 
 #define MAX_RX_QUEUE_PER_LCORE 16
 #define MAX_TX_QUEUE_PER_PORT 16
-struct lcore_queue_conf {
+struct lcore_queue_conf
+{
 	unsigned n_rx_port;
 	unsigned rx_port_list[MAX_RX_QUEUE_PER_LCORE];
 } __rte_cache_aligned;
@@ -103,10 +105,11 @@ static struct rte_eth_conf port_conf = {
 	},
 };
 
-struct rte_mempool * l2fwd_pktmbuf_pool = NULL;
+struct rte_mempool *l2fwd_pktmbuf_pool = NULL;
 
 /* Per-port statistics struct */
-struct l2fwd_port_statistics {
+struct l2fwd_port_statistics
+{
 	uint64_t tx;
 	uint64_t rx;
 	uint64_t dropped;
@@ -128,22 +131,23 @@ print_stats(void)
 	total_packets_tx = 0;
 	total_packets_rx = 0;
 
-	const char clr[] = { 27, '[', '2', 'J', '\0' };
-	const char topLeft[] = { 27, '[', '1', ';', '1', 'H','\0' };
+	const char clr[] = {27, '[', '2', 'J', '\0'};
+	const char topLeft[] = {27, '[', '1', ';', '1', 'H', '\0'};
 
-		/* Clear screen and move to top left */
+	/* Clear screen and move to top left */
 	printf("%s%s", clr, topLeft);
 
 	printf("\nPort statistics ====================================");
 
-	for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
+	for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++)
+	{
 		/* skip disabled ports */
 		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
 			continue;
 		printf("\nStatistics for port %u ------------------------------"
-			   "\nPackets sent: %24"PRIu64
-			   "\nPackets received: %20"PRIu64
-			   "\nPackets dropped: %21"PRIu64,
+			   "\nPackets sent: %24" PRIu64
+			   "\nPackets received: %20" PRIu64
+			   "\nPackets dropped: %21" PRIu64,
 			   portid,
 			   port_statistics[portid].tx,
 			   port_statistics[portid].rx,
@@ -154,9 +158,9 @@ print_stats(void)
 		total_packets_rx += port_statistics[portid].rx;
 	}
 	printf("\nAggregate statistics ==============================="
-		   "\nTotal packets sent: %18"PRIu64
-		   "\nTotal packets received: %14"PRIu64
-		   "\nTotal packets dropped: %15"PRIu64,
+		   "\nTotal packets sent: %18" PRIu64
+		   "\nTotal packets received: %14" PRIu64
+		   "\nTotal packets dropped: %15" PRIu64,
 		   total_packets_tx,
 		   total_packets_rx,
 		   total_packets_dropped);
@@ -167,30 +171,43 @@ print_stats(void)
 
 /* +++++++++++++++++++++++++++++++++ */
 #define DEBUG 0
-#define debug_print(fmt, ...) \
-            do { if (DEBUG) fprintf(stdout, fmt, __VA_ARGS__); } while (0)
-
+#define debug_print(fmt, ...)                  \
+	do                                         \
+	{                                          \
+		if (DEBUG)                             \
+			fprintf(stdout, fmt, __VA_ARGS__); \
+	} while (0)
 
 #define LAYER_NUM 3
 #define SEG_NUM 5
 unsigned normal_order[] = {2, 3, 4};
 
+#define COPY_ORDER(dst, src) \
+	memcpy(dst, src, LAYER_NUM * sizeof(unsigned))
+
+#define CMP_ORDER(dst, src) \
+	memcmp(dst, src, LAYER_NUM * sizeof(unsigned))
+
 static void
-print_order(unsigned* order, unsigned enter)
+print_order(unsigned *order, unsigned enter)
 {
-	for (int i =0; i<LAYER_NUM; i++) {
+	for (int i = 0; i < LAYER_NUM; i++)
+	{
 		printf("%u ", order[i]);
 	}
-	if (enter) printf("\n");
+	if (enter)
+		printf("\n");
 }
 
-struct seg {
+struct seg
+{
 	unsigned start_pos;
 	unsigned len;
 	unsigned is_branch;
 };
 
-struct layer {
+struct layer
+{
 	struct seg seg_vec[SEG_NUM];
 	unsigned seg_len;
 	// unsigned start_pos;
@@ -198,27 +215,29 @@ struct layer {
 };
 
 static void
-push_seg(struct layer* lay, unsigned start_pos, unsigned len, unsigned is_branch)
+push_seg(struct layer *lay, unsigned start_pos, unsigned len, unsigned is_branch)
 {
 	lay->seg_vec[lay->seg_len].start_pos = start_pos;
 	lay->seg_vec[lay->seg_len].len = len;
 	lay->seg_vec[lay->seg_len].is_branch = is_branch;
-	lay->seg_len ++;
+	lay->seg_len++;
 }
 
 #define FOR_EACH_SEG(LAY, SEG) \
-	int xxx; \
-	if (LAY->seg_len > 0)	   \
-		for (xxx=0, SEG=&(LAY->seg_vec[0]); xxx<LAY->seg_len; xxx++, SEG=&(LAY->seg_vec[xxx]))
+	int xxx;                   \
+	if (LAY->seg_len > 0)      \
+		for (xxx = 0, SEG = &(LAY->seg_vec[0]); xxx < LAY->seg_len; xxx++, SEG = &(LAY->seg_vec[xxx]))
 
 static void
-print_layers(struct layer* layers, unsigned num_layer)
+print_layers(struct layer *layers, unsigned num_layer)
 {
-	for (unsigned i=0; i<num_layer; i++) {
+	for (unsigned i = 0; i < num_layer; i++)
+	{
 		printf("layer %u: ", i);
-		struct layer* lay = &layers[i];
-		struct seg* cur_seg;
-		FOR_EACH_SEG(lay, cur_seg) {
+		struct layer *lay = &layers[i];
+		struct seg *cur_seg;
+		FOR_EACH_SEG(lay, cur_seg)
+		{
 			printf("SEG, start: %u, len: %u   ", cur_seg->start_pos, cur_seg->len);
 		}
 		printf("\n");
@@ -226,12 +245,13 @@ print_layers(struct layer* layers, unsigned num_layer)
 	printf("\n");
 }
 
-static unsigned 
-len_of_layer(struct layer* lay)
+static unsigned
+len_of_layer(struct layer *lay)
 {
 	unsigned len = 0;
-	struct seg* cur_seg;
-	FOR_EACH_SEG(lay, cur_seg) {
+	struct seg *cur_seg;
+	FOR_EACH_SEG(lay, cur_seg)
+	{
 		len += cur_seg->len;
 	}
 	// printf("len of layer: %u\n", len);
@@ -239,53 +259,63 @@ len_of_layer(struct layer* lay)
 }
 
 static unsigned
-len_of_br_seg(struct layer* lay)
+len_of_br_seg(struct layer *lay)
 {
 	unsigned len = 0;
-	struct seg* cur_seg;
-	FOR_EACH_SEG(lay, cur_seg) {
-		if (cur_seg->is_branch) len += cur_seg->len;
+	struct seg *cur_seg;
+	FOR_EACH_SEG(lay, cur_seg)
+	{
+		if (cur_seg->is_branch)
+			len += cur_seg->len;
 	}
 
 	return len;
 }
 
-struct branchers {
-	rte_be16_t 	ether_type;
-	uint8_t	proto;
+struct branchers
+{
+	rte_be16_t ether_type;
+	uint8_t proto;
 };
 
 #define L2BRSIZE 2
 #define L3BRSIZE 1
-#define BRSIZE (L2BRSIZE+L3BRSIZE)
+#define BRSIZE (L2BRSIZE + L3BRSIZE)
 
-void print_brs(struct branchers* brs)
+void print_brs(struct branchers *brs)
 {
 	printf("\n");
 	printf("L2: ETH ");
-	if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+	if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
 		printf("L3: IPv4 ");
 	}
-	else if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_ARP)) {
+	else if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_ARP))
+	{
 		printf("L3: ARP ");
 		printf("brs->proto should be -1: %u", brs->proto);
 		printf("\n");
 		return;
 	}
-	else {
+	else
+	{
 		printf("L3: unkown ");
 	}
 
-	if (brs->proto == IPPROTO_TCP) {
+	if (brs->proto == IPPROTO_TCP)
+	{
 		printf("L4: TCP\n");
 	}
-	else if (brs->proto == IPPROTO_UDP) {
+	else if (brs->proto == IPPROTO_UDP)
+	{
 		printf("L4: UDP\n");
 	}
-	else if (brs->proto == IPPROTO_ICMP) {
+	else if (brs->proto == IPPROTO_ICMP)
+	{
 		printf("L4: ICMP\n");
 	}
-	else {
+	else
+	{
 		printf("L4: unknown\n");
 	}
 
@@ -293,29 +323,31 @@ void print_brs(struct branchers* brs)
 }
 
 static void
-parse_eth(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_eth(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
-	struct rte_ether_hdr *hdr = (struct rte_ether_hdr*)(payload+start_pos);
+	struct rte_ether_hdr *hdr = (struct rte_ether_hdr *)(payload + start_pos);
 
 	push_seg(&layers[num_layer], start_pos, 12, 0);
 
 	/* raw: fake brs */
-	if (brs->ether_type == 0) {
+	if (brs->ether_type == 0)
+	{
 		brs->ether_type = hdr->ether_type;
-		push_seg(&layers[num_layer], start_pos+12, 2, 1);
+		push_seg(&layers[num_layer], start_pos + 12, 2, 1);
 	}
 	/* disordered: brs from begin */
-	else {
+	else
+	{
 		/* ether type from brs, offset 0*/
 		push_seg(&layers[num_layer], 0, 2, 1);
 	}
 }
 
 static void
-parse_ip(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_ip(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
 	/* can reuse rte_ipv4_hdr even for a broken ipv4, because ihl is not impacted */
-	struct rte_ipv4_hdr *hdr = (struct rte_ipv4_hdr *)(payload+start_pos);
+	struct rte_ipv4_hdr *hdr = (struct rte_ipv4_hdr *)(payload + start_pos);
 	unsigned len = (hdr->version_ihl & 0xf) * 4;
 
 	// printf("ipv4 hdr len: %u\n", len);
@@ -328,28 +360,29 @@ parse_ip(char* payload, unsigned start_pos, struct layer *layers, unsigned num_l
 	/* do not include proto */
 	start_pos += 9;
 	/* raw: fake brs */
-	if (brs->proto == 0) {
+	if (brs->proto == 0)
+	{
 		brs->proto = hdr->next_proto_id;
 		push_seg(&layers[num_layer], start_pos, 1, 1);
 		start_pos += 1;
 	}
 	/* disorderred: */
-	else {
+	else
+	{
 		/* proto is at offset 2 */
 		push_seg(&layers[num_layer], 2, 1, 1);
 	}
 
 	/* second part of IP (after proto) */
-	push_seg(&layers[num_layer], start_pos, len-9-1, 0);
+	push_seg(&layers[num_layer], start_pos, len - 9 - 1, 0);
 
 	// printf("ip parsed, with proto %u\n", brs->proto);
-
 }
 
 static void
-parse_arp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_arp(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
-	struct rte_arp_hdr* hdr = (struct rte_arp_hdr*)(payload+start_pos);
+	struct rte_arp_hdr *hdr = (struct rte_arp_hdr *)(payload + start_pos);
 	unsigned len = sizeof(struct rte_arp_hdr);
 
 	push_seg(&layers[num_layer], start_pos, len, 0);
@@ -360,9 +393,9 @@ parse_arp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_
 }
 
 static void
-parse_tcp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_tcp(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
-	struct rte_tcp_hdr* hdr = (struct rte_tcp_hdr*)(payload+start_pos);
+	struct rte_tcp_hdr *hdr = (struct rte_tcp_hdr *)(payload + start_pos);
 	unsigned len = (hdr->data_off & 0xf0) >> 2;
 	push_seg(&layers[num_layer], start_pos, len, 0);
 
@@ -370,18 +403,18 @@ parse_tcp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_
 }
 
 static void
-parse_udp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_udp(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
-	struct rte_udp_hdr* hdr = (struct rte_udp_hdr*)(payload+start_pos);
+	struct rte_udp_hdr *hdr = (struct rte_udp_hdr *)(payload + start_pos);
 	unsigned len = sizeof(struct rte_udp_hdr);
 
 	push_seg(&layers[num_layer], start_pos, len, 0);
 }
 
 static void
-parse_icmp(char* payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers* brs)
+parse_icmp(char *payload, unsigned start_pos, struct layer *layers, unsigned num_layer, struct branchers *brs)
 {
-	struct rte_icmp_hdr* hdr = (struct rte_icmp_hdr*)(payload+start_pos);
+	struct rte_icmp_hdr *hdr = (struct rte_icmp_hdr *)(payload + start_pos);
 	unsigned len = sizeof(struct rte_icmp_hdr);
 
 	push_seg(&layers[num_layer], start_pos, len, 0);
@@ -391,108 +424,127 @@ parse_icmp(char* payload, unsigned start_pos, struct layer *layers, unsigned num
 
 /* swap the field accordingly */
 static void
-parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer* layers, struct branchers* fake_brs)
-{	
-	char* payload = rte_pktmbuf_mtod(m, char*);
+parse_fields(struct rte_mbuf *m, unsigned *cur_order, struct layer *layers, struct branchers *fake_brs)
+{
+	char *payload = rte_pktmbuf_mtod(m, char *);
 
 	unsigned num_layers = 0;
 	unsigned raw = 0;
 	unsigned restore = 0;
-	if (CMP_ORDER(normal_order, cur_order) == 0) raw = 1;
+	if (CMP_ORDER(normal_order, cur_order) == 0)
+		raw = 1;
 
 	/* 2, 3, 4 in normal order */
-	for (int i=0; i<LAYER_NUM; i++) {
+	for (int i = 0; i < LAYER_NUM; i++)
+	{
 		layers[i].seg_len = 0;
 	}
 
 	/* 2->3, 3->4 */
-	struct branchers* brs = fake_brs;
+	struct branchers *brs = fake_brs;
 
 	unsigned cur_pos;
 
 	// printf("ready to parse packet\n");
 
 	/* fixed 2-3-4 */
-	if (raw) {
+	if (raw)
+	{
 		cur_pos = 0;
 	}
-	else {
+	else
+	{
 		/* all branchers are in order of 2->3, 3->4 */
-		brs = (struct branchers*)payload;
+		brs = (struct branchers *)payload;
 		unsigned brs_size = brs->ether_type == RTE_ETHER_TYPE_ARP ? L2BRSIZE : BRSIZE;
 		// print_brs(brs);
 		cur_pos = brs_size;
 		debug_print("init cur_pos in disorder case: %u\n", cur_pos);
 	}
 
-	for (int i=0; i<LAYER_NUM; i++) {
+	for (int i = 0; i < LAYER_NUM; i++)
+	{
 		unsigned cur_layer = cur_order[i];
 		// printf("cur_layer: %u\n", cur_layer);
 
-		if (cur_layer == 2) {
+		if (cur_layer == 2)
+		{
 			/* must be Ethernet */
 			// printf("cur_pos: %u\n", cur_pos);
 			parse_eth(payload, cur_pos, layers, 0, brs);
 			cur_pos += len_of_layer(&layers[0]) - (raw ? 0 : len_of_br_seg(&layers[0]));
 		}
-		else if (cur_layer == 3) {
+		else if (cur_layer == 3)
+		{
 			// printf("cur_pos: %u\n", cur_pos);
 			/* get it from brs->ether_type */
-			if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+			if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+			{
 				parse_ip(payload, cur_pos, layers, 1, brs);
 			}
-			else if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_ARP)) {
+			else if (brs->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_ARP))
+			{
 				parse_arp(payload, cur_pos, layers, 1, brs);
 			}
-			else {
+			else
+			{
 				// printf("unknown L3 proto\n");
 			}
 			cur_pos += len_of_layer(&layers[1]) - (raw ? 0 : len_of_br_seg(&layers[1]));
 		}
-		else if (cur_layer == 4) {
+		else if (cur_layer == 4)
+		{
 			// printf("cur_pos: %u\n", cur_pos);
 			/* no layer 4 */
-			if (brs->proto == -1) {
+			if (brs->proto == -1)
+			{
 				// printf("no layer 4\n");
 				continue;
 			}
 
 			/* get if from brs->proto */
-			if (brs->proto == IPPROTO_TCP) {
+			if (brs->proto == IPPROTO_TCP)
+			{
 				parse_tcp(payload, cur_pos, layers, 2, brs);
 			}
-			else if (brs->proto == IPPROTO_UDP) {
+			else if (brs->proto == IPPROTO_UDP)
+			{
 				parse_udp(payload, cur_pos, layers, 2, brs);
 			}
-			else if (brs->proto == IPPROTO_ICMP) {
+			else if (brs->proto == IPPROTO_ICMP)
+			{
 				parse_icmp(payload, cur_pos, layers, 2, brs);
 			}
-			else {
+			else
+			{
 				// printf("unknown L4 proto\n");
 			}
 			cur_pos += len_of_layer(&layers[2]) - (raw ? 0 : len_of_br_seg(&layers[2]));
 		}
-		else {
+		else
+		{
 			printf("cur_layer goes wrong, %u\n", cur_layer);
 		}
 	}
-
 }
 
 static void
-assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order, unsigned* target_order, struct layer* layers, struct branchers* brs)
+assemble_fields(struct rte_mbuf *new, struct rte_mbuf *old, unsigned *cur_order, unsigned *target_order, struct layer *layers, struct branchers *brs)
 {
 	unsigned restore = 0;
 	unsigned raw = 0;
-	if (CMP_ORDER(normal_order, cur_order) == 0) raw = 1;
-	if (CMP_ORDER(normal_order, target_order) == 0) restore = 1;
+	if (CMP_ORDER(normal_order, cur_order) == 0)
+		raw = 1;
+	if (CMP_ORDER(normal_order, target_order) == 0)
+		restore = 1;
 
-	char* payload = rte_pktmbuf_mtod(old, char*);
-	char* new_payload = rte_pktmbuf_mtod(new, char*);
+	char *payload = rte_pktmbuf_mtod(old, char *);
+	char *new_payload = rte_pktmbuf_mtod(new, char *);
 	unsigned cur_pos = 0;
 	unsigned total_copy = 0;
 
-	if (raw && restore) {
+	if (raw && restore)
+	{
 		printf("should not appear\n");
 		exit(-2);
 	}
@@ -500,21 +552,26 @@ assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order,
 	unsigned brs_size = brs->ether_type == RTE_ETHER_TYPE_ARP ? L2BRSIZE : BRSIZE;
 
 	/* from disorder/raw to disorder */
-	if (!restore) {
+	if (!restore)
+	{
 		memcpy(new_payload, brs, brs_size);
 		cur_pos = brs_size;
 	}
-	else {
+	else
+	{
 		cur_pos = 0;
 	}
 
-	for (int i=0; i<LAYER_NUM; i++) {
-		struct layer* cur_lay = &layers[target_order[i]-2];
-		struct seg* cur_seg;
-		FOR_EACH_SEG(cur_lay, cur_seg) {
-			if (restore || !cur_seg->is_branch) {
+	for (int i = 0; i < LAYER_NUM; i++)
+	{
+		struct layer *cur_lay = &layers[target_order[i] - 2];
+		struct seg *cur_seg;
+		FOR_EACH_SEG(cur_lay, cur_seg)
+		{
+			if (restore || !cur_seg->is_branch)
+			{
 				debug_print("copying %u (len: %u) from old to new %u\n", cur_seg->start_pos, cur_seg->len, cur_pos);
-				memcpy(new_payload+cur_pos, payload+cur_seg->start_pos, cur_seg->len);
+				memcpy(new_payload + cur_pos, payload + cur_seg->start_pos, cur_seg->len);
 				cur_pos += cur_seg->len;
 			}
 		}
@@ -523,7 +580,7 @@ assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order,
 	// printf("original len: %u\n", rte_pktmbuf_pkt_len(m));
 	// printf("final pos: %u\n", cur_pos);
 	// printf("now len: %u\n", rte_pktmbuf_pkt_len(assemble));
-	
+
 	// return assemble;
 }
 
@@ -532,139 +589,140 @@ assemble_fields(struct rte_mbuf* new, struct rte_mbuf* old, unsigned *cur_order,
 #define TABLE_SIZE 10
 #define TABLE_FILE "./mac_table.txt"
 
-#define COPY_ORDER(dst, src) \
-	memcpy(dst, src, LAYER_NUM*sizeof(unsigned))
-
-#define CMP_ORDER(dst, src) \
-	memcmp(dst, src, LAYER_NUM*sizeof(unsigned))
-
-struct mac_rule {
+struct mac_rule
+{
 	uint8_t dst_mac[6];
 	unsigned target_order[LAYER_NUM];
 	unsigned out_port;
 };
 
-static void 
-print_mac(uint8_t* mac, char enter)
+static void
+print_mac(uint8_t *mac, char enter)
 {
-	for (int i=0; i<6; i++) {
+	for (int i = 0; i < 6; i++)
+	{
 		printf("%02x", mac[i]);
 	}
-	if (enter) printf("\n");
+	if (enter)
+		printf("\n");
 }
 
 static void
-print_rule(struct mac_rule* rule)
+print_rule(struct mac_rule *rule)
 {
 	printf("MAC: ");
 	print_mac(rule->dst_mac, 0);
 	printf("   ORDER: ");
-	for (int i=0; i<LAYER_NUM; i++) {
+	for (int i = 0; i < LAYER_NUM; i++)
+	{
 		printf("%u ", rule->target_order[i]);
 	}
 	printf("   PORT: ");
 	printf("%u\n", rule->out_port);
 }
 
-struct mac_table {
+struct mac_table
+{
 	struct mac_rule rules[TABLE_SIZE];
 	unsigned rule_num;
 	unsigned version;
 };
 
 static int
-match_table(struct mac_table* table, uint8_t* dst_mac)
+match_table(struct mac_table *table, uint8_t *dst_mac)
 {
 	int matched = -1;
 	// printf("matching\n");
-	for (int i=0; i<table->rule_num; i++) {
+	for (int i = 0; i < table->rule_num; i++)
+	{
 		// printf("matching ");
 		// print_mac(dst_mac, 0);
 		// printf(" with ");
 		// print_mac(table->rules[i].dst_mac, 1);
-		if (memcmp(table->rules[i].dst_mac, dst_mac, 6) == 0) {
+		if (memcmp(table->rules[i].dst_mac, dst_mac, 6) == 0)
+		{
 			matched = i;
 			break;
 		}
-
 	}
 	// printf("matched\n");
 	return matched;
 }
 
 static void
-clear_table(struct mac_table* table)
+clear_table(struct mac_table *table)
 {
-	memset(table->rules, 0, table->rule_num*sizeof(struct mac_rule));
+	memset(table->rules, 0, table->rule_num * sizeof(struct mac_rule));
 	table->rule_num = 0;
 }
 
 static void
-print_table(struct mac_table* table)
+print_table(struct mac_table *table)
 {
-	for (int i=0; i<table->rule_num; i++) {
+	for (int i = 0; i < table->rule_num; i++)
+	{
 		print_rule(&table->rules[i]);
 	}
 	printf("\n");
 }
 
-static uint8_t 
-hextobin(const char * str, uint8_t * bytes, size_t blen)
+static uint8_t
+hextobin(const char *str, uint8_t *bytes, size_t blen)
 {
-   uint8_t  pos;
-   uint8_t  idx0;
-   uint8_t  idx1;
+	uint8_t pos;
+	uint8_t idx0;
+	uint8_t idx1;
 
-   // mapping of ASCII characters to hex values
-   const uint8_t hashmap[] =
-   {
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  !"#$%&'
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ()*+,-./
-     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // 01234567
-     0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 89:;<=>?
-     0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // @ABCDEFG
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // HIJKLMNO
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // PQRSTUVW
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // XYZ[\]^_
-     0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // `abcdefg
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // hijklmno
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // pqrstuvw
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // xyz{|}~.
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // ........
-   };
+	// mapping of ASCII characters to hex values
+	const uint8_t hashmap[] =
+		{
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  !"#$%&'
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ()*+,-./
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // 01234567
+			0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 89:;<=>?
+			0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // @ABCDEFG
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // HIJKLMNO
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // PQRSTUVW
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // XYZ[\]^_
+			0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // `abcdefg
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // hijklmno
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // pqrstuvw
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // xyz{|}~.
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00	// ........
+		};
 
-   bzero(bytes, blen);
-   for (pos = 0; ((pos < (blen*2)) && (pos < strlen(str))); pos += 2)
-   {
-      idx0 = (uint8_t)str[pos+0];
-      idx1 = (uint8_t)str[pos+1];
-      bytes[pos/2] = (uint8_t)(hashmap[idx0] << 4) | hashmap[idx1];
-   };
+	bzero(bytes, blen);
+	for (pos = 0; ((pos < (blen * 2)) && (pos < strlen(str))); pos += 2)
+	{
+		idx0 = (uint8_t)str[pos + 0];
+		idx1 = (uint8_t)str[pos + 1];
+		bytes[pos / 2] = (uint8_t)(hashmap[idx0] << 4) | hashmap[idx1];
+	};
 
-   return(0);
+	return (0);
 }
 
 static void
-add_rule(struct mac_table* table, uint8_t* dst_mac, unsigned* target_order, unsigned out_port)
+add_rule(struct mac_table *table, uint8_t *dst_mac, unsigned *target_order, unsigned out_port)
 {
 	memcpy(table->rules[table->rule_num].dst_mac, dst_mac, 6);
 	COPY_ORDER(table->rules[table->rule_num].target_order, target_order);
@@ -674,42 +732,50 @@ add_rule(struct mac_table* table, uint8_t* dst_mac, unsigned* target_order, unsi
 }
 
 static void
-process_rule(struct mac_table* table, char* line)
+process_rule(struct mac_table *table, char *line)
 {
 	uint8_t dst_mac[6];
 	unsigned target_order[LAYER_NUM];
 	unsigned out_port;
 
-	char* field;
+	char *field;
 	field = strtok(line, " ");
 	int index = 1;
-	while (field != NULL) {
+	while (field != NULL)
+	{
 		// printf("%s\n", field);
 		field = strtok(NULL, " ");
-		switch (index) {
-			/* mac */
-			case 1: {
-				hextobin(field, dst_mac, 6);
-				break;
+		switch (index)
+		{
+		/* mac */
+		case 1:
+		{
+			hextobin(field, dst_mac, 6);
+			break;
+		}
+		/* order */
+		case 3:
+		{
+			if (strlen(field) != LAYER_NUM)
+			{
+				printf("field len (%lu) != LAYER_NUM (%u)\n", strlen(field), LAYER_NUM);
 			}
-			/* order */
-			case 3: {
-				if (strlen(field) != LAYER_NUM) {
-					printf("field len (%lu) != LAYER_NUM (%u)\n", strlen(field), LAYER_NUM);
-				}
-				unsigned order_num = atoi(field);
-				for (int i=LAYER_NUM-1; i != -1; i--) {
-					target_order[i] = order_num % 10;
-					order_num = order_num / 10;
-				}
-				break;
+			unsigned order_num = atoi(field);
+			for (int i = LAYER_NUM - 1; i != -1; i--)
+			{
+				target_order[i] = order_num % 10;
+				order_num = order_num / 10;
 			}
-			/* port */
-			case 5: {
-				out_port = atoi(field);
-				break;
-			}
-			default: break;
+			break;
+		}
+		/* port */
+		case 5:
+		{
+			out_port = atoi(field);
+			break;
+		}
+		default:
+			break;
 		}
 		index++;
 	}
@@ -718,41 +784,45 @@ process_rule(struct mac_table* table, char* line)
 }
 
 static void
-update_table(struct mac_table* table)
+update_table(struct mac_table *table)
 {
 	// printf("updating table\n");
 	// print_table(table);
 
-	FILE* fp;
+	FILE *fp;
 	fp = fopen(TABLE_FILE, "r");
-	if (fp == NULL) return;
+	if (fp == NULL)
+		return;
 
-
-	char* line = NULL;
+	char *line = NULL;
 	size_t len = 0;
 	ssize_t read;
 
 	read = getline(&line, &len, fp);
-	if (read == -1) {
+	if (read == -1)
+	{
 		printf("read table file wrong\n");
 		fclose(fp);
 		return;
 	}
 
 	unsigned version = atoi(line);
-	if (version == table->version) {
+	if (version == table->version)
+	{
 		fclose(fp);
 		return;
 	}
 
 	clear_table(table);
 	table->version = version;
-	while ((read = getline(&line, &len, fp)) != -1) {
-		process_rule(table, line);		
+	while ((read = getline(&line, &len, fp)) != -1)
+	{
+		process_rule(table, line);
 	}
 	fclose(fp);
 
-	if (table->rule_num == 0) {
+	if (table->rule_num == 0)
+	{
 		printf("no table rule, exit\n");
 		exit(-1);
 	}
@@ -792,7 +862,6 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 		port_statistics[dst_port].tx += sent;
 }
 
-
 /* main processing loop */
 static void
 l2fwd_main_loop(void)
@@ -805,14 +874,14 @@ l2fwd_main_loop(void)
 	unsigned i, j, portid, nb_rx;
 	struct lcore_queue_conf *qconf;
 	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
-			BURST_TX_DRAIN_US;
+							   BURST_TX_DRAIN_US;
 	struct rte_eth_dev_tx_buffer *buffer;
 
 	struct mac_table per_core_table;
 	unsigned per_core_order[LAYER_NUM];
 	per_core_table.rule_num = 0;
 	update_table(&per_core_table);
-	
+
 	COPY_ORDER(per_core_order, per_core_table.rules[0].target_order);
 
 	prev_tsc = 0;
@@ -821,22 +890,24 @@ l2fwd_main_loop(void)
 	lcore_id = rte_lcore_id();
 	qconf = &lcore_queue_conf[lcore_id];
 
-	if (qconf->n_rx_port == 0) {
+	if (qconf->n_rx_port == 0)
+	{
 		RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
 		return;
 	}
 
 	RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
 
-	for (i = 0; i < qconf->n_rx_port; i++) {
+	for (i = 0; i < qconf->n_rx_port; i++)
+	{
 
 		portid = qconf->rx_port_list[i];
 		RTE_LOG(INFO, L2FWD, " -- lcoreid=%u portid=%u\n", lcore_id,
-			portid);
-
+				portid);
 	}
 
-	while (!force_quit) {
+	while (!force_quit)
+	{
 
 		cur_tsc = rte_rdtsc();
 
@@ -844,9 +915,11 @@ l2fwd_main_loop(void)
 		 * TX burst queue drain
 		 */
 		diff_tsc = cur_tsc - prev_tsc;
-		if (unlikely(diff_tsc > drain_tsc)) {
+		if (unlikely(diff_tsc > drain_tsc))
+		{
 
-			for (i = 0; i < qconf->n_rx_port; i++) {
+			for (i = 0; i < qconf->n_rx_port; i++)
+			{
 
 				portid = l2fwd_dst_ports[qconf->rx_port_list[i]];
 				buffer = tx_buffer[portid];
@@ -854,18 +927,19 @@ l2fwd_main_loop(void)
 				sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
 				if (sent)
 					port_statistics[portid].tx += sent;
-
 			}
 
 			/* if timer is enabled */
-			if (timer_period > 0) {
+			if (timer_period > 0)
+			{
 
 				/* advance the timer */
 				timer_tsc += diff_tsc;
 
 				/* if timer has reached its timeout */
-				if (unlikely(timer_tsc >= timer_period)) {
-					
+				if (unlikely(timer_tsc >= timer_period))
+				{
+
 					/* do this only on main core */
 					// if (lcore_id == rte_get_main_lcore()) {
 					// 	print_stats();
@@ -885,15 +959,17 @@ l2fwd_main_loop(void)
 		/*
 		 * Read packet from RX queues
 		 */
-		for (i = 0; i < qconf->n_rx_port; i++) {
+		for (i = 0; i < qconf->n_rx_port; i++)
+		{
 
 			portid = qconf->rx_port_list[i];
 			nb_rx = rte_eth_rx_burst(portid, 0,
-						 pkts_burst, MAX_PKT_BURST);
+									 pkts_burst, MAX_PKT_BURST);
 
 			port_statistics[portid].rx += nb_rx;
 
-			for (j = 0; j < nb_rx; j++) {
+			for (j = 0; j < nb_rx; j++)
+			{
 				m = pkts_burst[j];
 				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
 
@@ -903,12 +979,14 @@ l2fwd_main_loop(void)
 
 				// printf("\n\n");
 				/* from normal port, meaning it is in 2-3-4 order */
-				if (portid == NORMAL_PORT) {
+				if (portid == NORMAL_PORT)
+				{
 					// printf("coming from normal port\n");
 					COPY_ORDER(cur_order, normal_order);
 				}
 				/* by default we view each packet is in global order (usually disordered) */
-				else {
+				else
+				{
 					// printf("non-normal port: ");
 					// print_order(per_core_order, 1);
 					COPY_ORDER(cur_order, per_core_order);
@@ -928,15 +1006,17 @@ l2fwd_main_loop(void)
 
 				// printf("\nMATCHING\n");
 				/* get dst mac addr from layers */
-				u_char* payload = rte_pktmbuf_mtod(m, u_char*);
-				uint8_t* dst_mac = payload + layers[0].seg_vec[0].start_pos;
+				u_char *payload = rte_pktmbuf_mtod(m, u_char *);
+				uint8_t *dst_mac = payload + layers[0].seg_vec[0].start_pos;
 				// print_mac(dst_mac, 1);
 				int matched = match_table(&per_core_table, dst_mac);
-				if (matched < 0) {
+				if (matched < 0)
+				{
 					printf("no match for current mac, dropped\n");
 					continue;
 				}
-				else {
+				else
+				{
 					// printf("rule matched\n");
 					struct mac_rule *matched_rule = &per_core_table.rules[matched];
 					// print_rule(matched_rule);
@@ -946,13 +1026,15 @@ l2fwd_main_loop(void)
 				}
 
 				/* from normal port, meaning it should be assembled in 2-3-4 order */
-				if (dst_port == NORMAL_PORT) {
+				if (dst_port == NORMAL_PORT)
+				{
 					// printf("sending to normal port\n");
 					COPY_ORDER(target_order, normal_order);
 				}
 
 				/* if order is not changed */
-				if (CMP_ORDER(cur_order, target_order) == 0) {
+				if (CMP_ORDER(cur_order, target_order) == 0)
+				{
 					// printf("no change, directly forward to dst_port\n");
 					l2fwd_port_forward(m, dst_port);
 					continue;
@@ -960,8 +1042,9 @@ l2fwd_main_loop(void)
 
 				// printf("\nASSEMBLE\n");
 				// struct rte_mbuf* assemble = assemble_fields(m, cur_order, target_order, layers, &brs);
-				struct rte_mbuf* clone_mbuf = rte_pktmbuf_copy(m, l2fwd_pktmbuf_pool, 0, 10000000);
-				if (clone_mbuf == NULL) {
+				struct rte_mbuf *clone_mbuf = rte_pktmbuf_copy(m, l2fwd_pktmbuf_pool, 0, 10000000);
+				if (clone_mbuf == NULL)
+				{
 					printf("mbuf copying wrong\n");
 					exit(-1);
 				}
@@ -1024,16 +1107,16 @@ static void
 l2fwd_usage(const char *prgname)
 {
 	printf("%s [EAL options] -- -p PORTMASK [-q NQ]\n"
-	       "  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
-	       "  -q NQ: number of queue (=ports) per lcore (default is 1)\n"
-	       "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 10 default, 86400 maximum)\n"
-	       "  --[no-]mac-updating: Enable or disable MAC addresses updating (enabled by default)\n"
-	       "      When enabled:\n"
-	       "       - The source MAC address is replaced by the TX port MAC address\n"
-	       "       - The destination MAC address is replaced by 02:00:00:00:00:TX_PORT_ID\n"
-	       "  --portmap: Configure forwarding port pair mapping\n"
-	       "	      Default: alternate port pairs\n\n",
-	       prgname);
+		   "  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
+		   "  -q NQ: number of queue (=ports) per lcore (default is 1)\n"
+		   "  -T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 10 default, 86400 maximum)\n"
+		   "  --[no-]mac-updating: Enable or disable MAC addresses updating (enabled by default)\n"
+		   "      When enabled:\n"
+		   "       - The source MAC address is replaced by the TX port MAC address\n"
+		   "       - The destination MAC address is replaced by 02:00:00:00:00:TX_PORT_ID\n"
+		   "  --portmap: Configure forwarding port pair mapping\n"
+		   "	      Default: alternate port pairs\n\n",
+		   prgname);
 }
 
 static int
@@ -1053,7 +1136,8 @@ l2fwd_parse_portmask(const char *portmask)
 static int
 l2fwd_parse_port_pair_config(const char *q_arg)
 {
-	enum fieldnames {
+	enum fieldnames
+	{
 		FLD_PORT1 = 0,
 		FLD_PORT2,
 		_NUM_FLD
@@ -1068,7 +1152,8 @@ l2fwd_parse_port_pair_config(const char *q_arg)
 
 	nb_port_pair_params = 0;
 
-	while ((p = strchr(p0, '(')) != NULL) {
+	while ((p = strchr(p0, '(')) != NULL)
+	{
 		++p;
 		p0 = strchr(p, ')');
 		if (p0 == NULL)
@@ -1081,24 +1166,26 @@ l2fwd_parse_port_pair_config(const char *q_arg)
 		memcpy(s, p, size);
 		s[size] = '\0';
 		if (rte_strsplit(s, sizeof(s), str_fld,
-				 _NUM_FLD, ',') != _NUM_FLD)
+						 _NUM_FLD, ',') != _NUM_FLD)
 			return -1;
-		for (i = 0; i < _NUM_FLD; i++) {
+		for (i = 0; i < _NUM_FLD; i++)
+		{
 			errno = 0;
 			int_fld[i] = strtoul(str_fld[i], &end, 0);
 			if (errno != 0 || end == str_fld[i] ||
-			    int_fld[i] >= RTE_MAX_ETHPORTS)
+				int_fld[i] >= RTE_MAX_ETHPORTS)
 				return -1;
 		}
-		if (nb_port_pair_params >= RTE_MAX_ETHPORTS/2) {
+		if (nb_port_pair_params >= RTE_MAX_ETHPORTS / 2)
+		{
 			printf("exceeded max number of port pair params: %hu\n",
-				nb_port_pair_params);
+				   nb_port_pair_params);
 			return -1;
 		}
 		port_pair_params_array[nb_port_pair_params].port[0] =
-				(uint16_t)int_fld[FLD_PORT1];
+			(uint16_t)int_fld[FLD_PORT1];
 		port_pair_params_array[nb_port_pair_params].port[1] =
-				(uint16_t)int_fld[FLD_PORT2];
+			(uint16_t)int_fld[FLD_PORT2];
 		++nb_port_pair_params;
 	}
 	port_pair_params = port_pair_params_array;
@@ -1140,16 +1227,17 @@ l2fwd_parse_timer_period(const char *q_arg)
 }
 
 static const char short_options[] =
-	"p:"  /* portmask */
-	"q:"  /* number of queues */
-	"T:"  /* timer period */
+	"p:" /* portmask */
+	"q:" /* number of queues */
+	"T:" /* timer period */
 	;
 
 #define CMD_LINE_OPT_MAC_UPDATING "mac-updating"
 #define CMD_LINE_OPT_NO_MAC_UPDATING "no-mac-updating"
 #define CMD_LINE_OPT_PORTMAP_CONFIG "portmap"
 
-enum {
+enum
+{
 	/* long options mapped to a short option */
 
 	/* first long only option value must be >= 256, so that we won't
@@ -1159,11 +1247,10 @@ enum {
 };
 
 static const struct option lgopts[] = {
-	{ CMD_LINE_OPT_MAC_UPDATING, no_argument, &mac_updating, 1},
-	{ CMD_LINE_OPT_NO_MAC_UPDATING, no_argument, &mac_updating, 0},
-	{ CMD_LINE_OPT_PORTMAP_CONFIG, 1, 0, CMD_LINE_OPT_PORTMAP_NUM},
-	{NULL, 0, 0, 0}
-};
+	{CMD_LINE_OPT_MAC_UPDATING, no_argument, &mac_updating, 1},
+	{CMD_LINE_OPT_NO_MAC_UPDATING, no_argument, &mac_updating, 0},
+	{CMD_LINE_OPT_PORTMAP_CONFIG, 1, 0, CMD_LINE_OPT_PORTMAP_NUM},
+	{NULL, 0, 0, 0}};
 
 /* Parse the argument given in the command line of the application */
 static int
@@ -1178,13 +1265,16 @@ l2fwd_parse_args(int argc, char **argv)
 	port_pair_params = NULL;
 
 	while ((opt = getopt_long(argc, argvopt, short_options,
-				  lgopts, &option_index)) != EOF) {
+							  lgopts, &option_index)) != EOF)
+	{
 
-		switch (opt) {
+		switch (opt)
+		{
 		/* portmask */
 		case 'p':
 			l2fwd_enabled_port_mask = l2fwd_parse_portmask(optarg);
-			if (l2fwd_enabled_port_mask == 0) {
+			if (l2fwd_enabled_port_mask == 0)
+			{
 				printf("invalid portmask\n");
 				l2fwd_usage(prgname);
 				return -1;
@@ -1194,7 +1284,8 @@ l2fwd_parse_args(int argc, char **argv)
 		/* nqueue */
 		case 'q':
 			l2fwd_rx_queue_per_lcore = l2fwd_parse_nqueue(optarg);
-			if (l2fwd_rx_queue_per_lcore == 0) {
+			if (l2fwd_rx_queue_per_lcore == 0)
+			{
 				printf("invalid queue number\n");
 				l2fwd_usage(prgname);
 				return -1;
@@ -1204,7 +1295,8 @@ l2fwd_parse_args(int argc, char **argv)
 		/* timer period */
 		case 'T':
 			timer_secs = l2fwd_parse_timer_period(optarg);
-			if (timer_secs < 0) {
+			if (timer_secs < 0)
+			{
 				printf("invalid timer period\n");
 				l2fwd_usage(prgname);
 				return -1;
@@ -1215,7 +1307,8 @@ l2fwd_parse_args(int argc, char **argv)
 		/* long options */
 		case CMD_LINE_OPT_PORTMAP_NUM:
 			ret = l2fwd_parse_port_pair_config(optarg);
-			if (ret) {
+			if (ret)
+			{
 				fprintf(stderr, "Invalid config\n");
 				l2fwd_usage(prgname);
 				return -1;
@@ -1229,9 +1322,9 @@ l2fwd_parse_args(int argc, char **argv)
 	}
 
 	if (optind >= 0)
-		argv[optind-1] = prgname;
+		argv[optind - 1] = prgname;
 
-	ret = optind-1;
+	ret = optind - 1;
 	optind = 1; /* reset getopt lib */
 	return ret;
 }
@@ -1247,26 +1340,31 @@ check_port_pair_config(void)
 	uint32_t port_pair_mask = 0;
 	uint16_t index, i, portid;
 
-	for (index = 0; index < nb_port_pair_params; index++) {
+	for (index = 0; index < nb_port_pair_params; index++)
+	{
 		port_pair_mask = 0;
 
-		for (i = 0; i < NUM_PORTS; i++)  {
+		for (i = 0; i < NUM_PORTS; i++)
+		{
 			portid = port_pair_params[index].port[i];
-			if ((l2fwd_enabled_port_mask & (1 << portid)) == 0) {
+			if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+			{
 				printf("port %u is not enabled in port mask\n",
-				       portid);
+					   portid);
 				return -1;
 			}
-			if (!rte_eth_dev_is_valid_port(portid)) {
+			if (!rte_eth_dev_is_valid_port(portid))
+			{
 				printf("port %u is not present on the board\n",
-				       portid);
+					   portid);
 				return -1;
 			}
 
 			port_pair_mask |= 1 << portid;
 		}
 
-		if (port_pair_config_mask & port_pair_mask) {
+		if (port_pair_config_mask & port_pair_mask)
+		{
 			printf("port %u is used in other port pairs\n", portid);
 			return -1;
 		}
@@ -1283,7 +1381,7 @@ static void
 check_all_ports_link_status(uint32_t port_mask)
 {
 #define CHECK_INTERVAL 100 /* 100ms */
-#define MAX_CHECK_TIME 90 /* 9s (90 * 100ms) in total */
+#define MAX_CHECK_TIME 90  /* 9s (90 * 100ms) in total */
 	uint16_t portid;
 	uint8_t count, all_ports_up, print_flag = 0;
 	struct rte_eth_link link;
@@ -1292,34 +1390,39 @@ check_all_ports_link_status(uint32_t port_mask)
 
 	printf("\nChecking link status");
 	fflush(stdout);
-	for (count = 0; count <= MAX_CHECK_TIME; count++) {
+	for (count = 0; count <= MAX_CHECK_TIME; count++)
+	{
 		if (force_quit)
 			return;
 		all_ports_up = 1;
-		RTE_ETH_FOREACH_DEV(portid) {
+		RTE_ETH_FOREACH_DEV(portid)
+		{
 			if (force_quit)
 				return;
 			if ((port_mask & (1 << portid)) == 0)
 				continue;
 			memset(&link, 0, sizeof(link));
 			ret = rte_eth_link_get_nowait(portid, &link);
-			if (ret < 0) {
+			if (ret < 0)
+			{
 				all_ports_up = 0;
 				if (print_flag == 1)
 					printf("Port %u link get failed: %s\n",
-						portid, rte_strerror(-ret));
+						   portid, rte_strerror(-ret));
 				continue;
 			}
 			/* print link status if flag set */
-			if (print_flag == 1) {
+			if (print_flag == 1)
+			{
 				rte_eth_link_to_str(link_status_text,
-					sizeof(link_status_text), &link);
+									sizeof(link_status_text), &link);
 				printf("Port %d %s\n", portid,
-				       link_status_text);
+					   link_status_text);
 				continue;
 			}
 			/* clear all_ports_up flag if any link down */
-			if (link.link_status == ETH_LINK_DOWN) {
+			if (link.link_status == ETH_LINK_DOWN)
+			{
 				all_ports_up = 0;
 				break;
 			}
@@ -1328,14 +1431,16 @@ check_all_ports_link_status(uint32_t port_mask)
 		if (print_flag == 1)
 			break;
 
-		if (all_ports_up == 0) {
+		if (all_ports_up == 0)
+		{
 			printf(".");
 			fflush(stdout);
 			rte_delay_ms(CHECK_INTERVAL);
 		}
 
 		/* set the print_flag if all ports up or timeout */
-		if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1)) {
+		if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1))
+		{
 			print_flag = 1;
 			printf("done\n");
 		}
@@ -1345,15 +1450,15 @@ check_all_ports_link_status(uint32_t port_mask)
 static void
 signal_handler(int signum)
 {
-	if (signum == SIGINT || signum == SIGTERM) {
+	if (signum == SIGINT || signum == SIGTERM)
+	{
 		printf("\n\nSignal %d received, preparing to exit...\n",
-				signum);
+			   signum);
 		force_quit = true;
 	}
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	struct lcore_queue_conf *qconf;
 	int ret;
@@ -1390,7 +1495,8 @@ main(int argc, char **argv)
 	if (nb_ports == 0)
 		rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
 
-	if (port_pair_params != NULL) {
+	if (port_pair_params != NULL)
+	{
 		if (check_port_pair_config() < 0)
 			rte_exit(EXIT_FAILURE, "Invalid port pair config\n");
 	}
@@ -1398,7 +1504,7 @@ main(int argc, char **argv)
 	/* check port mask to possible port mask */
 	if (l2fwd_enabled_port_mask & ~((1 << nb_ports) - 1))
 		rte_exit(EXIT_FAILURE, "Invalid portmask; possible (0x%x)\n",
-			(1 << nb_ports) - 1);
+				 (1 << nb_ports) - 1);
 
 	/* reset l2fwd_dst_ports */
 	for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++)
@@ -1406,31 +1512,40 @@ main(int argc, char **argv)
 	last_port = 0;
 
 	/* populate destination port details */
-	if (port_pair_params != NULL) {
+	if (port_pair_params != NULL)
+	{
 		uint16_t idx, p;
 
-		for (idx = 0; idx < (nb_port_pair_params << 1); idx++) {
+		for (idx = 0; idx < (nb_port_pair_params << 1); idx++)
+		{
 			p = idx & 1;
 			portid = port_pair_params[idx >> 1].port[p];
 			l2fwd_dst_ports[portid] =
 				port_pair_params[idx >> 1].port[p ^ 1];
 		}
-	} else {
-		RTE_ETH_FOREACH_DEV(portid) {
+	}
+	else
+	{
+		RTE_ETH_FOREACH_DEV(portid)
+		{
 			/* skip ports that are not enabled */
 			if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
 				continue;
 
-			if (nb_ports_in_mask % 2) {
+			if (nb_ports_in_mask % 2)
+			{
 				l2fwd_dst_ports[portid] = last_port;
 				l2fwd_dst_ports[last_port] = portid;
-			} else {
+			}
+			else
+			{
 				last_port = portid;
 			}
 
 			nb_ports_in_mask++;
 		}
-		if (nb_ports_in_mask % 2) {
+		if (nb_ports_in_mask % 2)
+		{
 			printf("Notice: odd number of ports in portmask.\n");
 			l2fwd_dst_ports[last_port] = last_port;
 		}
@@ -1440,21 +1555,24 @@ main(int argc, char **argv)
 	qconf = NULL;
 
 	/* Initialize the port/queue configuration of each logical core */
-	RTE_ETH_FOREACH_DEV(portid) {
+	RTE_ETH_FOREACH_DEV(portid)
+	{
 		/* skip ports that are not enabled */
 		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
 			continue;
 
 		/* get the lcore_id for this port */
 		while (rte_lcore_is_enabled(rx_lcore_id) == 0 ||
-		       lcore_queue_conf[rx_lcore_id].n_rx_port ==
-		       l2fwd_rx_queue_per_lcore) {
+			   lcore_queue_conf[rx_lcore_id].n_rx_port ==
+				   l2fwd_rx_queue_per_lcore)
+		{
 			rx_lcore_id++;
 			if (rx_lcore_id >= RTE_MAX_LCORE)
 				rte_exit(EXIT_FAILURE, "Not enough cores\n");
 		}
 
-		if (qconf != &lcore_queue_conf[rx_lcore_id]) {
+		if (qconf != &lcore_queue_conf[rx_lcore_id])
+		{
 			/* Assigned a new logical core in the loop above. */
 			qconf = &lcore_queue_conf[rx_lcore_id];
 			nb_lcores++;
@@ -1463,28 +1581,31 @@ main(int argc, char **argv)
 		qconf->rx_port_list[qconf->n_rx_port] = portid;
 		qconf->n_rx_port++;
 		printf("Lcore %u: RX port %u TX port %u\n", rx_lcore_id,
-		       portid, l2fwd_dst_ports[portid]);
+			   portid, l2fwd_dst_ports[portid]);
 	}
 
 	nb_mbufs = RTE_MAX(nb_ports * (nb_rxd + nb_txd + MAX_PKT_BURST +
-		nb_lcores * MEMPOOL_CACHE_SIZE), 8192U);
+								   nb_lcores * MEMPOOL_CACHE_SIZE),
+					   8192U);
 
 	/* create the mbuf pool */
 	l2fwd_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", nb_mbufs,
-		MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
-		rte_socket_id());
+												 MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
+												 rte_socket_id());
 	if (l2fwd_pktmbuf_pool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
 	/* Initialise each port */
-	RTE_ETH_FOREACH_DEV(portid) {
+	RTE_ETH_FOREACH_DEV(portid)
+	{
 		struct rte_eth_rxconf rxq_conf;
 		struct rte_eth_txconf txq_conf;
 		struct rte_eth_conf local_port_conf = port_conf;
 		struct rte_eth_dev_info dev_info;
 
 		/* skip ports that are not enabled */
-		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0) {
+		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
+		{
 			printf("Skipping disabled port %u\n", portid);
 			continue;
 		}
@@ -1497,8 +1618,8 @@ main(int argc, char **argv)
 		ret = rte_eth_dev_info_get(portid, &dev_info);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
-				"Error during getting device (port %u) info: %s\n",
-				portid, strerror(-ret));
+					 "Error during getting device (port %u) info: %s\n",
+					 portid, strerror(-ret));
 
 		if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
 			local_port_conf.txmode.offloads |=
@@ -1506,98 +1627,99 @@ main(int argc, char **argv)
 		ret = rte_eth_dev_configure(portid, 1, 1, &local_port_conf);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "Cannot configure device: err=%d, port=%u\n",
-				  ret, portid);
+					 ret, portid);
 
 		ret = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd,
-						       &nb_txd);
+											   &nb_txd);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE,
-				 "Cannot adjust number of descriptors: err=%d, port=%u\n",
-				 ret, portid);
+					 "Cannot adjust number of descriptors: err=%d, port=%u\n",
+					 ret, portid);
 
 		ret = rte_eth_macaddr_get(portid,
-					  &l2fwd_ports_eth_addr[portid]);
+								  &l2fwd_ports_eth_addr[portid]);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE,
-				 "Cannot get MAC address: err=%d, port=%u\n",
-				 ret, portid);
+					 "Cannot get MAC address: err=%d, port=%u\n",
+					 ret, portid);
 
 		/* init one RX queue */
 		fflush(stdout);
 		rxq_conf = dev_info.default_rxconf;
 		rxq_conf.offloads = local_port_conf.rxmode.offloads;
 		ret = rte_eth_rx_queue_setup(portid, 0, nb_rxd,
-					     rte_eth_dev_socket_id(portid),
-					     &rxq_conf,
-					     l2fwd_pktmbuf_pool);
+									 rte_eth_dev_socket_id(portid),
+									 &rxq_conf,
+									 l2fwd_pktmbuf_pool);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "rte_eth_rx_queue_setup:err=%d, port=%u\n",
-				  ret, portid);
+					 ret, portid);
 
 		/* init one TX queue on each port */
 		fflush(stdout);
 		txq_conf = dev_info.default_txconf;
 		txq_conf.offloads = local_port_conf.txmode.offloads;
 		ret = rte_eth_tx_queue_setup(portid, 0, nb_txd,
-				rte_eth_dev_socket_id(portid),
-				&txq_conf);
+									 rte_eth_dev_socket_id(portid),
+									 &txq_conf);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "rte_eth_tx_queue_setup:err=%d, port=%u\n",
-				ret, portid);
+					 ret, portid);
 
 		/* Initialize TX buffers */
 		tx_buffer[portid] = rte_zmalloc_socket("tx_buffer",
-				RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
-				rte_eth_dev_socket_id(portid));
+											   RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
+											   rte_eth_dev_socket_id(portid));
 		if (tx_buffer[portid] == NULL)
 			rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
-					portid);
+					 portid);
 
 		rte_eth_tx_buffer_init(tx_buffer[portid], MAX_PKT_BURST);
 
 		ret = rte_eth_tx_buffer_set_err_callback(tx_buffer[portid],
-				rte_eth_tx_buffer_count_callback,
-				&port_statistics[portid].dropped);
+												 rte_eth_tx_buffer_count_callback,
+												 &port_statistics[portid].dropped);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE,
-			"Cannot set error callback for tx buffer on port %u\n",
-				 portid);
+					 "Cannot set error callback for tx buffer on port %u\n",
+					 portid);
 
 		ret = rte_eth_dev_set_ptypes(portid, RTE_PTYPE_UNKNOWN, NULL,
-					     0);
+									 0);
 		if (ret < 0)
 			printf("Port %u, Failed to disable Ptype parsing\n",
-					portid);
+				   portid);
 		/* Start device */
 		ret = rte_eth_dev_start(portid);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "rte_eth_dev_start:err=%d, port=%u\n",
-				  ret, portid);
+					 ret, portid);
 
 		printf("done: \n");
 
 		ret = rte_eth_promiscuous_enable(portid);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
-				 "rte_eth_promiscuous_enable:err=%s, port=%u\n",
-				 rte_strerror(-ret), portid);
+					 "rte_eth_promiscuous_enable:err=%s, port=%u\n",
+					 rte_strerror(-ret), portid);
 
 		printf("Port %u, MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
-				portid,
-				l2fwd_ports_eth_addr[portid].addr_bytes[0],
-				l2fwd_ports_eth_addr[portid].addr_bytes[1],
-				l2fwd_ports_eth_addr[portid].addr_bytes[2],
-				l2fwd_ports_eth_addr[portid].addr_bytes[3],
-				l2fwd_ports_eth_addr[portid].addr_bytes[4],
-				l2fwd_ports_eth_addr[portid].addr_bytes[5]);
+			   portid,
+			   l2fwd_ports_eth_addr[portid].addr_bytes[0],
+			   l2fwd_ports_eth_addr[portid].addr_bytes[1],
+			   l2fwd_ports_eth_addr[portid].addr_bytes[2],
+			   l2fwd_ports_eth_addr[portid].addr_bytes[3],
+			   l2fwd_ports_eth_addr[portid].addr_bytes[4],
+			   l2fwd_ports_eth_addr[portid].addr_bytes[5]);
 
 		/* initialize port stats */
 		memset(&port_statistics, 0, sizeof(port_statistics));
 	}
 
-	if (!nb_ports_available) {
+	if (!nb_ports_available)
+	{
 		rte_exit(EXIT_FAILURE,
-			"All available ports are disabled. Please set portmask.\n");
+				 "All available ports are disabled. Please set portmask.\n");
 	}
 
 	check_all_ports_link_status(l2fwd_enabled_port_mask);
@@ -1605,21 +1727,24 @@ main(int argc, char **argv)
 	ret = 0;
 	/* launch per-lcore init on every lcore */
 	rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, NULL, CALL_MAIN);
-	RTE_LCORE_FOREACH_WORKER(lcore_id) {
-		if (rte_eal_wait_lcore(lcore_id) < 0) {
+	RTE_LCORE_FOREACH_WORKER(lcore_id)
+	{
+		if (rte_eal_wait_lcore(lcore_id) < 0)
+		{
 			ret = -1;
 			break;
 		}
 	}
 
-	RTE_ETH_FOREACH_DEV(portid) {
+	RTE_ETH_FOREACH_DEV(portid)
+	{
 		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
 			continue;
 		printf("Closing port %d...", portid);
 		ret = rte_eth_dev_stop(portid);
 		if (ret != 0)
 			printf("rte_eth_dev_stop: err=%d, port=%d\n",
-			       ret, portid);
+				   ret, portid);
 		rte_eth_dev_close(portid);
 		printf(" Done\n");
 	}
